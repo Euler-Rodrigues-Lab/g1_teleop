@@ -9,11 +9,31 @@ description = "Unitree G1 teleoperation (sim + hardware) on the geo-kin-core int
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10"
-dependencies = ["numpy", "mujoco", "geo-kin-core"]
+dependencies = ["numpy", "scipy", "mujoco", "geo-kin-core"]
 
 [project.optional-dependencies]
-hw = ["unitree_sdk2py"]
+hw = ["unitree_sdk2py", "pyyaml", "pymodbus"]
 devices = []  # xrt-device, mediapipe-device once split out
+test = ["pytest"]
 
 [tool.setuptools.packages.find]
 include = ["g1_teleop*"]
+
+[tool.setuptools.package-data]
+g1_teleop = [
+    "assets/*.urdf",
+    "assets/*.xml",
+    "assets/g1_29dof/*.xml",
+    "assets/g1_29dof/meshes/*",
+    "assets/g1_with_inspire_hand/*.xml",
+    "assets/g1_with_inspire_hand/*.urdf",
+    "assets/meshes/*",
+    "assets/specs/*.npz",
+    "control/hw/*.yaml",
+]
+
+[tool.pytest.ini_options]
+markers = [
+    "geo: needs the private geo_kin_ref package or the licensed geo_kin wheel (dev machine only; excluded on public CI via -m 'not geo')",
+]
+testpaths = ["tests"]

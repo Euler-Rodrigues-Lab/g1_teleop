@@ -1,0 +1,54 @@
+# g1_teleop CI: public robot repo (MIT).
+#
+# Marker policy: -m "not geo".
+#   * geo — tests that need the private geo_kin_ref reference package (dev
+#     machine only) or the licensed geo_kin wheel. Public CI has neither, so
+#     they are excluded; this workflow MUST pass without geo_kin_ref.
+# The mink/quadprog fallback solver path from geo-kin-core is the only solver
+# available here.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  python:
+    name: python (pytest, no geo marker)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+
+      - name: create venv
+        run: uv venv --python 3.10
+
+      - name: install package + deps
+        run: |
+          # geo-kin-core is a sibling public repo, not on PyPI.
+          uv pip install "geo-kin-core @ git+https://github.com/Euler-Rodrigues-Lab/geo_kin_core"
+          uv pip install -e . pytest
+
+      - name: smoke import (headless MuJoCo)
+        env:
+          MUJOCO_GL: disabled
+        run: .venv/bin/python -c "import g1_teleop; print(g1_teleop.__name__, 'OK')"
+
+      - name: pytest (geo-marked tests excluded, see header comment)
+        shell: bash
+        env:
+          MUJOCO_GL: disabled
+        run: |
+          set +e
+          .venv/bin/pytest -q -m "not geo"
+          rc=$?
+          # exit code 5 = no tests collected after filtering; tolerated
+          # until non-geo tests land.
+          if [ "$rc" -eq 5 ]; then
+            echo "no tests selected after marker filtering - OK"
+            exit 0
+          fi
+          exit "$rc"
