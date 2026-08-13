@@ -28,7 +28,7 @@ checkout (`--monolith_path` / `GEO_TELEOP_MONOLITH`) until the `xrt_device`
 repo is split out; everything else in this repo is self-contained.
 
 Runs out of the box with the public fallback solver; install the licensed
-`geo_kin` wheel for the SEW geometric solver (see Euler-Rodrigues-Lab/geo-kin-core
+`geo_kin` wheel for the SEW geometric solver (see Euler-Rodrigues-Lab/geo_kin_core
 for how solver resolution works).
 
 MIT licensed. The SEW retargeting solver itself is patented & licensed separately.

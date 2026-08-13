@@ -23,8 +23,6 @@ include = ["g1_teleop*"]
 g1_teleop = [
     "assets/*.urdf",
     "assets/*.xml",
-    "assets/g1_29dof/*.xml",
-    "assets/g1_29dof/meshes/*",
     "assets/g1_with_inspire_hand/*.xml",
     "assets/g1_with_inspire_hand/*.urdf",
     "assets/meshes/*",
