@@ -19,6 +19,7 @@ from typing import Optional, Tuple
 from geo_kin_core.frames import load_frames
 from geo_kin_core.types import RetargetFrame
 
+from .openxr_skeleton import bones_to_skeleton
 from .xr_adapter import action_to_retarget_frame, resolve_monolith_path
 
 
@@ -80,7 +81,11 @@ class OfflineCSVAdapter:
         bones = self.get_bones_at_time(elapsed_time)
         if bones is None:
             return None, None
-        return action_to_retarget_frame(self._bones_to_action(bones)), bones
+        frame = action_to_retarget_frame(self._bones_to_action(bones))
+        if frame is not None:
+            # Raw capture skeleton for the overlay (solvers ignore it).
+            frame.skeleton = bones_to_skeleton(bones)
+        return frame, bones
 
     def frame_at_time(self, elapsed_time: float) -> Optional[RetargetFrame]:
         """Frame at `elapsed_time` (common motion-source interface)."""

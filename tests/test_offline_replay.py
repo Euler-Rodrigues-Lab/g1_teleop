@@ -138,3 +138,58 @@ def test_replay_demo_headless_from_csv():
     frame, _ = step(model, data, controller, session, source, 0.5)
     assert frame is not None
     assert controller.q_goal_torso is not None
+
+
+def test_sample_motion_carries_the_capture_skeleton():
+    """The overlay draws raw bones, so the vendored stream must ship them."""
+    frame = open_motion_source(frames=SAMPLE_MOTION).frame_at_time(0.5)
+    skeleton = frame.skeleton
+    assert skeleton is not None
+    names, parents = skeleton["names"], skeleton["parents"]
+    assert len(names) == len(parents) == len(skeleton["positions"])
+    assert (parents >= 0).sum() >= 60          # full-body skeleton, not a stub
+    # the parts that were missing when the overlay reconstructed from SEW only
+    assert any("Spine" in n for n in names)
+    assert any("FootBall" in n for n in names)          # toes
+    assert sum("Index" in n for n in names) >= 8        # per-hand finger bones
+
+
+@needs_recording
+def test_skeleton_matches_the_capture_side_visualizer():
+    """Our overlay must draw exactly the segments the monolith viewer draws."""
+    import sys
+
+    import geo_kin_core.viz.capsules as caps
+    from geo_kin_core.viz import HumanCapsuleViz
+    from g1_teleop.input import OfflineCSVAdapter
+
+    sys.path.insert(0, MONOLITH)
+    from projects.shared_scripts.mujoco_human_capsule import MujocoHumanCapsule
+
+    frame, bones = OfflineCSVAdapter(RECORDING, loop=False).get_frame_at_time(1.0)
+    p_off = np.array([0.3, -0.2, 0.1])
+    r_off = np.array([[0.0, -1.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]])
+
+    class FakeViewer:
+        user_scn = object()
+
+    reference = MujocoHumanCapsule(FakeViewer())
+    ref_caps = []
+    reference._add_capsule = lambda a, b, r: ref_caps.append(
+        (tuple(np.round(a, 9)), tuple(np.round(b, 9)), round(r, 9)))
+    reference.set_base_offset(p_off, r_off)
+    reference.update(bones)
+
+    ours = []
+    original = caps.add_capsule
+    caps.add_capsule = lambda v, a, b, r, rgba=None: (
+        ours.append((tuple(np.round(a, 9)), tuple(np.round(b, 9)), round(r, 9))), True)[1]
+    try:
+        viz = HumanCapsuleViz(FakeViewer())
+        viz.set_base_offset(p_off, r_off)
+        viz.draw(frame)
+    finally:
+        caps.add_capsule = original
+
+    assert len(ours) == len(ref_caps) > 60
+    assert sorted(ours) == sorted(ref_caps)
