@@ -1,9 +1,9 @@
 # Copyright (c) 2026 Chuizheng Kong. Licensed under the MIT License.
-"""Offline CSV replay: adapter conversion + (when a monolith checkout with the
-device deps is available) a real recording driven through the replay demo.
+"""Offline replay: the vendored sample frame stream, the adapter conversion, and
+(when a monolith checkout with the device deps is available) the CSV path.
 
-The conversion tests run everywhere — they need neither the monolith, nor a
-recording, nor a solver backend.
+Only the CSV tests need the monolith. Everything else — including replaying the
+vendored sample motion through the demo — runs on a clean checkout.
 """
 
 import importlib.util
@@ -15,7 +15,8 @@ os.environ.setdefault("MUJOCO_GL", "egl")
 import numpy as np
 import pytest
 
-from g1_teleop.input import action_to_retarget_frame
+from g1_teleop import SAMPLE_MOTION
+from g1_teleop.input import action_to_retarget_frame, open_motion_source
 
 MONOLITH = os.environ.get("GEO_TELEOP_MONOLITH")
 
@@ -81,30 +82,59 @@ def test_offline_adapter_yields_frames():
     assert frame.R_lower_upper is not None
 
 
-@needs_recording
-@pytest.mark.geo
-@pytest.mark.parametrize("hand", ["inspire", "psyonic"])
-def test_replay_demo_headless(hand):
-    """Drive the demo's own build/step helpers over a real recording."""
-    from g1_teleop.demos.replay_offline import build, count_self_contacts, parse_args, step
-
-    argv = ["--csv_file", str(RECORDING), "--hand", hand, "--headless", "--no-loop"]
+def _args(*argv):
     import sys
+    from g1_teleop.demos.replay_offline import parse_args
+
     old, sys.argv = sys.argv, ["replay_offline", *argv]
     try:
-        args = parse_args()
+        return parse_args()
     finally:
         sys.argv = old
 
+
+def test_sample_motion_is_vendored():
+    """The demo must run on a clean checkout: no device, no monolith."""
+    stream = open_motion_source(frames=SAMPLE_MOTION)
+    assert stream.duration > 1.0
+    frame = stream.frame_at_time(0.5)
+    assert frame is not None
+    assert frame.left_sew is not None and frame.right_sew is not None
+    assert frame.R_lower_upper is not None          # torso solvable
+    assert frame.left_fingers and frame.right_fingers  # hands solvable
+    # exact joint key names the solvers look up
+    assert "index_finger_mcp" in frame.right_fingers["index"]
+
+
+@pytest.mark.geo
+@pytest.mark.parametrize("hand", ["inspire", "psyonic"])
+def test_replay_demo_headless_from_sample(hand):
+    """Drive the demo's own build/step helpers over the vendored sample."""
+    from g1_teleop.demos.replay_offline import build, count_self_contacts, step
+
+    args = _args("--hand", hand, "--headless", "--no-loop")
     model, data, controller, session, source = build(args)
     solved = 0
     for i in range(20):
-        bones, solve_time = step(model, data, controller, session, source, i / args.max_fr)
-        if bones is not None:
+        frame, solve_time = step(model, data, controller, session, source, i / args.max_fr)
+        if frame is not None:
             solved += 1
             assert solve_time >= 0.0
             assert count_self_contacts(model, data) >= 0
     assert solved == 20
     # The replay actually moved the robot off its initial pose.
     assert np.linalg.norm(data.qpos) > 0.0
+    assert controller.q_goal_torso is not None
+
+
+@needs_recording
+@pytest.mark.geo
+def test_replay_demo_headless_from_csv():
+    """The CSV path stays wired (needs the monolith device stack)."""
+    from g1_teleop.demos.replay_offline import build, step
+
+    args = _args("--csv_file", str(RECORDING), "--headless", "--no-loop")
+    model, data, controller, session, source = build(args)
+    frame, _ = step(model, data, controller, session, source, 0.5)
+    assert frame is not None
     assert controller.q_goal_torso is not None

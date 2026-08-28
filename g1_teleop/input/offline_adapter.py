@@ -16,6 +16,7 @@ monolith ships them under ``References/recordings/``).
 import sys
 from typing import Optional, Tuple
 
+from geo_kin_core.frames import load_frames
 from geo_kin_core.types import RetargetFrame
 
 from .xr_adapter import action_to_retarget_frame, resolve_monolith_path
@@ -80,3 +81,54 @@ class OfflineCSVAdapter:
         if bones is None:
             return None, None
         return action_to_retarget_frame(self._bones_to_action(bones)), bones
+
+    def frame_at_time(self, elapsed_time: float) -> Optional[RetargetFrame]:
+        """Frame at `elapsed_time` (common motion-source interface)."""
+        return self.get_frame_at_time(elapsed_time)[0]
+
+    def describe(self) -> str:
+        return f"CSV recording {self.reader.csv_file_path if hasattr(self.reader, 'csv_file_path') else ''}".strip()
+
+
+class FrameStreamSource:
+    """Playback of a vendored geo_kin_core frame stream (.npz).
+
+    Same interface as :class:`OfflineCSVAdapter` but with no device
+    dependencies at all — this is what the demo uses by default so it runs on
+    a clean checkout.
+    """
+
+    def __init__(self, path, playback_speed: float = 1.0, loop: bool = True):
+        self.stream = load_frames(path)
+        self.playback_speed = float(playback_speed)
+        self.loop = loop
+
+    @property
+    def duration(self) -> float:
+        return self.stream.duration
+
+    def frame_at_time(self, elapsed_time: float) -> Optional[RetargetFrame]:
+        return self.stream.frame_at_time(
+            elapsed_time, loop=self.loop, playback_speed=self.playback_speed)
+
+    def get_frame_at_time(self, elapsed_time: float) -> Tuple[Optional[RetargetFrame], None]:
+        return self.frame_at_time(elapsed_time), None
+
+    def describe(self) -> str:
+        return (f"frame stream {self.stream.path.name} "
+                f"({len(self.stream)} frames @ {self.stream.fps:g}Hz, source: {self.stream.source})")
+
+
+def open_motion_source(frames=None, csv_file=None, playback_speed: float = 1.0,
+                       loop: bool = True, monolith_path=None):
+    """Open a motion source: a frame stream (preferred) or a recorded CSV.
+
+    Exactly one of `frames` / `csv_file` must be given. Frame streams need
+    nothing but numpy; CSVs need a monolith checkout with the device deps.
+    """
+    if (frames is None) == (csv_file is None):
+        raise ValueError("open_motion_source: pass exactly one of frames=/csv_file=")
+    if frames is not None:
+        return FrameStreamSource(frames, playback_speed=playback_speed, loop=loop)
+    return OfflineCSVAdapter(csv_file, playback_speed=playback_speed, loop=loop,
+                             monolith_path=monolith_path)

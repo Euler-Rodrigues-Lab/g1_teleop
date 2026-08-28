@@ -27,6 +27,8 @@ g1_teleop = [
     "assets/g1_with_inspire_hand/*.urdf",
     "assets/meshes/*",
     "assets/specs/*.npz",
+    "assets/sample_motion/*.npz",
+    "assets/sample_motion/*.md",
     "control/hw/*.yaml",
 ]
 

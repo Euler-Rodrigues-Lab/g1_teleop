@@ -7,6 +7,12 @@ __version__ = "0.1.0"
 
 ASSETS_DIR = Path(__file__).parent / "assets"
 SPECS_DIR = ASSETS_DIR / "specs"
+#: Vendored sample human motion (geo_kin_core frame stream) so the offline
+#: replay demo and its tests run on a clean checkout, with no capture device,
+#: no monolith checkout, and no hardware. Also the worked example of the
+#: frame-stream format a new device adapter must produce.
+SAMPLE_MOTION_DIR = ASSETS_DIR / "sample_motion"
+SAMPLE_MOTION = SAMPLE_MOTION_DIR / "picking_up_mustard.npz"
 
 # MJCF variants shipped with the package (meshdir="meshes" resolves in-tree).
 XML_POSITION_CTRL = ASSETS_DIR / "g1_29dof_position_ctrl.xml"

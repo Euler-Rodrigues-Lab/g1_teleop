@@ -39,6 +39,7 @@ import mujoco.viewer
 import numpy as np
 
 from geo_kin_core.session import resolve_session
+from geo_kin_core.viz import HumanCapsuleViz, capsules, draw_filtered_sew
 
 from g1_teleop import XML_INSPIRE_MOUNTED, XML_POSITION_CTRL_DANCE_W_HANDS
 from g1_teleop.control import G1FullBodyMuJoCoController, G1InspireHandMuJoCoController
@@ -63,35 +64,12 @@ def update_sim_from_hardware(controller, data, q_right, q_left, q_torso):
 
 
 def visualize_filtered_capsules(viewer, session, controller, rgba=(0.2, 0.9, 0.2, 0.35)):
-    """Draw the post-XPBD filtered SEW capsules (solver diagnostics) if exposed.
+    """Draw the post-XPBD filtered SEW capsules (solver diagnostics).
 
-    Works with any backend that exposes ``last_filtered_sew`` + a ``sew_filter``
-    with ``parse_sew`` / ``sew_to_capsules`` (geo_kin_ref and the licensed
-    wheel both do); silently does nothing on backends that don't.
+    Thin wrapper over :func:`geo_kin_core.viz.draw_filtered_sew` so every robot
+    repo shares one implementation.
     """
-    filtered = getattr(session, "last_filtered_sew", None)
-    sew_filter = getattr(session, "sew_filter", None)
-    if filtered is None or sew_filter is None:
-        return
-    try:
-        capsules = sew_filter.sew_to_capsules(sew_filter.parse_sew(filtered))
-        to_world = controller.get_sew_transform()
-        for capsule in capsules.values():
-            p0, p1, radius = capsule.a, capsule.b, capsule.r
-            if viewer.user_scn.ngeom >= viewer.user_scn.maxgeom:
-                break
-            geom = viewer.user_scn.geoms[viewer.user_scn.ngeom]
-            mujoco.mjv_initGeom(
-                geom, mujoco.mjtGeom.mjGEOM_CAPSULE,
-                np.zeros(3), np.zeros(3), np.eye(3).flatten(),
-                np.asarray(rgba, dtype=np.float32))
-            mujoco.mjv_connector(
-                geom, mujoco.mjtGeom.mjGEOM_CAPSULE, float(radius),
-                np.asarray(to_world(np.asarray(p0)), dtype=np.float64),
-                np.asarray(to_world(np.asarray(p1)), dtype=np.float64))
-            viewer.user_scn.ngeom += 1
-    except Exception:
-        pass  # viz is best-effort; never take down the control loop
+    return draw_filtered_sew(viewer, session, to_world=controller.get_sew_transform(), rgba=rgba)
 
 
 def parse_args():

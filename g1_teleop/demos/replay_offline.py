@@ -5,9 +5,16 @@ Port of the monolith demo_g1_inspire_xr_robot_teleop_offline.py onto the
 geo_kin_core interface: solver = ``resolve_session(robot='g1', hand=...)``
 (licensed `geo_kin` wheel -> private geo_kin_ref -> public mink fallback),
 controller = :class:`g1_teleop.control.G1InspireHandMuJoCoController` (inspire)
-or :class:`g1_teleop.control.G1FullBodyMuJoCoController` (psyonic), source =
-:class:`g1_teleop.input.OfflineCSVAdapter` (interim; needs a monolith checkout
-via --monolith_path or GEO_TELEOP_MONOLITH until the xrt_device repo exists).
+or :class:`g1_teleop.control.G1FullBodyMuJoCoController` (psyonic), overlays =
+:mod:`geo_kin_core.viz`.
+
+Two motion sources, same interface:
+
+* a **frame stream** (``--frames``, the default) — the vendored sample motion,
+  device-neutral numpy, needs nothing but this repo;
+* a **recorded CSV** (``--csv_file``) — needs a SEW-Geometric-Teleop checkout
+  for the device stack (``--monolith_path`` / ``GEO_TELEOP_MONOLITH``); use
+  ``g1_teleop.scripts.transcode_recording`` to turn one into a frame stream.
 
 No headset and no robot required — this is the loop to use for tuning the
 solver, eyeballing the self-collision filter, and measuring solve time.
@@ -19,17 +26,22 @@ regardless of solve speed (--wall_clock restores wall-clock sampling).
 Differences from the monolith original, both deliberate:
   * the 3-DOF waist is actually solved from the recording's ``R_lower_upper``
     (the old demo stubbed it to identity); pass --no-torso for the old behavior;
-  * base alignment defaults to the validated ``mocap`` mode rather than
-    ``manual`` (--base_alignment manual restores the original).
+  * the recording is sampled on a fixed clock (see below).
+
+Base alignment stays on the monolith's offline default, ``manual``: it is the
+mode that anchors the capture frame to the robot, so the human-capsule overlay
+is drawn on top of the robot rather than at the raw capture coordinates.
 
 Examples:
-    # Replay a recording with the inspire hands, viewer + capsule overlays
+    # Vendored sample motion, inspire hands, viewer + overlays (no setup)
+    python -m g1_teleop.demos.replay_offline
+
+    # A recorded CSV instead (needs the monolith checkout)
     python -m g1_teleop.demos.replay_offline \
-        --csv_file ~/SEW-Geometric-Teleop/References/recordings/picking_up_mustard.csv
+        --csv_file $GEO_TELEOP_MONOLITH/References/recordings/ipman_roll.csv
 
     # Headless timing/collision sweep over one pass, stats to npz
-    python -m g1_teleop.demos.replay_offline --csv_file rec.csv \
-        --headless --no-loop --log_stats stats.npz
+    python -m g1_teleop.demos.replay_offline --headless --no-loop --log_stats stats.npz
 """
 
 import argparse
@@ -41,11 +53,11 @@ import mujoco
 import numpy as np
 
 from geo_kin_core.session import resolve_session
+from geo_kin_core.viz import HumanCapsuleViz, capsules, draw_filtered_sew
 
-from g1_teleop import XML_INSPIRE_MOUNTED, XML_POSITION_CTRL_DANCE_W_HANDS
+from g1_teleop import SAMPLE_MOTION, XML_INSPIRE_MOUNTED, XML_POSITION_CTRL_DANCE_W_HANDS
 from g1_teleop.control import G1FullBodyMuJoCoController, G1InspireHandMuJoCoController
-from g1_teleop.demos.teleop_xr import visualize_filtered_capsules
-from g1_teleop.input import OfflineCSVAdapter
+from g1_teleop.input import open_motion_source
 from g1_teleop.mjcf import load_mjcf
 
 
@@ -65,22 +77,14 @@ def count_self_contacts(model, data) -> int:
     return n
 
 
-def make_human_overlay(viewer, monolith_path=None):
-    """Best-effort human-skeleton overlay (monolith viz; None when absent)."""
-    try:
-        from projects.shared_scripts.mujoco_human_capsule import MujocoHumanCapsule
-    except Exception:
-        return None
-    try:
-        return MujocoHumanCapsule(viewer)
-    except Exception:
-        return None
-
-
 def parse_args():
     parser = argparse.ArgumentParser(description="G1 offline CSV replay")
-    parser.add_argument("--csv_file", required=True,
-                        help="Recorded OpenXR body-pose CSV to replay")
+    source = parser.add_mutually_exclusive_group()
+    source.add_argument("--frames", default=None,
+                        help=f"geo_kin_core frame stream (.npz); default: the vendored "
+                             f"sample motion ({SAMPLE_MOTION.name})")
+    source.add_argument("--csv_file", default=None,
+                        help="Recorded OpenXR body-pose CSV (needs a monolith checkout)")
     parser.add_argument("--hand", choices=["inspire", "psyonic"], default="inspire",
                         help="Hand embodiment (selects sim model + controller)")
     parser.add_argument("--playback_speed", type=float, default=1.0,
@@ -93,8 +97,11 @@ def parse_args():
                         help="Disable the 3-DOF waist solve (arms only)")
     parser.add_argument("--no_safety_filter", action="store_true",
                         help="Disable the XPBD self-collision SEW filter")
-    parser.add_argument("--base_alignment", choices=["mocap", "manual"], default="mocap",
-                        help="Base alignment mode ('manual' matches the old demo)")
+    parser.add_argument("--base_alignment", choices=["manual", "mocap"], default="manual",
+                        help="Base alignment mode. 'manual' (default, as in the monolith "
+                             "offline demo) anchors the capture to the robot, so the human "
+                             "overlay lands on it; 'mocap' leaves the human in raw capture "
+                             "coordinates, away from the robot")
     parser.add_argument("--elbow_filter_hz", type=float, default=2.0,
                         help="Elbow-orientation low-pass cutoff (Hz)")
     parser.add_argument("--shoulder_width_scale", type=float, default=0.8)
@@ -129,12 +136,17 @@ def build(args):
     model = load_mjcf(xml)
     data = mujoco.MjData(model)
 
-    source = OfflineCSVAdapter(
-        args.csv_file,
+    frames = args.frames
+    if frames is None and args.csv_file is None:
+        frames = SAMPLE_MOTION  # vendored sample: runs on a clean checkout
+    source = open_motion_source(
+        frames=frames,
+        csv_file=args.csv_file,
         playback_speed=args.playback_speed,
         loop=args.loop,
         monolith_path=args.monolith_path,
     )
+    print(f"Motion source: {source.describe()}")
     session = resolve_session(
         robot="g1",
         hand=args.hand,
@@ -160,8 +172,8 @@ def build(args):
 
 
 def step(model, data, controller, session, source, elapsed, engaged=True):
-    """Solve + apply one replay frame. Returns ``(bones, solve_seconds)``."""
-    frame, bones = source.get_frame_at_time(elapsed)
+    """Solve + apply one replay frame. Returns ``(frame, solve_seconds)``."""
+    frame = source.frame_at_time(elapsed)
     solve_time = 0.0
     if frame is not None:
         t0 = time.perf_counter()
@@ -176,7 +188,7 @@ def step(model, data, controller, session, source, elapsed, engaged=True):
 
     controller.apply_control(engaged=engaged, kinematic_mode=True)
     mujoco.mj_forward(model, data)
-    return bones, solve_time
+    return frame, solve_time
 
 
 def main():
@@ -197,7 +209,7 @@ def main():
     def run(viewer=None):
         overlay = None
         if viewer is not None and not args.no_human_overlay:
-            overlay = make_human_overlay(viewer, args.monolith_path)
+            overlay = HumanCapsuleViz(viewer)
         start = time.time()
         sim_time = 0.0  # deterministic playback clock (see --wall_clock)
         n = 0
@@ -207,13 +219,13 @@ def main():
             elapsed = (loop_start - start) if args.wall_clock else sim_time
             sim_time += frame_interval * args.playback_speed
             try:
-                bones, solve_time = step(model, data, controller, session, source, elapsed)
+                frame, solve_time = step(model, data, controller, session, source, elapsed)
             except Exception as e:
                 print(f"Error processing frame: {e}")
                 traceback.print_exc()
                 break
 
-            if bones is None:
+            if frame is None:
                 if not args.loop and not finished:
                     print("Playback finished.")
                     finished = True
@@ -225,20 +237,14 @@ def main():
                 contacts.append(count_self_contacts(model, data))
 
             if viewer is not None:
-                viewer.user_scn.ngeom = 0
-                visualize_filtered_capsules(viewer, session, controller)
-                if overlay is not None and bones is not None:
+                capsules.clear(viewer)
+                draw_filtered_sew(viewer, session, to_world=controller.get_sew_transform())
+                if overlay is not None and frame is not None:
                     R_mocap = getattr(session, "R_mocap_world", None)
                     p_mocap = getattr(session, "p_mocap_world", None)
                     if R_mocap is not None and p_mocap is not None:
-                        try:
-                            overlay.set_base_offset(np.asarray(p_mocap).T, np.asarray(R_mocap).T)
-                        except Exception:
-                            pass
-                    try:
-                        overlay.update(bones)
-                    except Exception:
-                        pass
+                        overlay.set_base_offset(p_mocap, np.asarray(R_mocap).T)
+                    overlay.draw(frame)
                 viewer.sync()
 
             if args.max_frames is not None and n >= args.max_frames:
