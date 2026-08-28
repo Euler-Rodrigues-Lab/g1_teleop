@@ -86,8 +86,11 @@ def action_to_retarget_frame(action: dict) -> Optional[RetargetFrame]:
         R_lower_upper=_opt_array(action.get("R_lower_upper"), (3, 3)),
         left_fingers=action.get("left_fingers"),
         right_fingers=action.get("right_fingers"),
-        left_hka=_opt_array(action.get("left_hka")),
-        right_hka=_opt_array(action.get("right_hka")),
+        # Leg keypoints arrive as per-leg dicts (H/K/A + ankle_rot + world
+        # positions), not arrays — pass them through untouched for future leg
+        # retargeting rather than coercing them to float arrays.
+        left_hka=action.get("left_hka"),
+        right_hka=action.get("right_hka"),
         left_gripper_val=action.get("left_gripper_val"),
         right_gripper_val=action.get("right_gripper_val"),
         extras=extras,
