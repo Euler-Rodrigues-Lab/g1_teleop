@@ -10,21 +10,33 @@ separate codebase. Legs are not retargeted yet (goals reserved in the API).
 
 ## Install
 
-Keep one shared `geo_kin_core` checkout beside this repository:
+Clone with the pinned public-core submodule and sync:
 
 ```bash
-cd /path/to/Euler-Rodrigues-Lab
-git clone https://github.com/Euler-Rodrigues-Lab/geo_kin_core.git
-git clone https://github.com/Euler-Rodrigues-Lab/g1_teleop.git
+git clone --recurse-submodules https://github.com/Euler-Rodrigues-Lab/g1_teleop.git
 cd g1_teleop
 uv sync
 ```
 
-The public fallback is then available. For licensed G1/Inspire retargeting,
-register the supplied files once as described in the `geo_kin_core` README,
-then link that shared build into this environment:
+For an existing checkout:
 
 ```bash
+git pull
+git submodule update --init --recursive
+uv sync
+```
+
+This installs `external/geo_kin_core`, including the public fallback and the
+`geo-kin-provision` command. For licensed G1/Inspire retargeting, register the
+supplied files once per user and then link the central build into this venv:
+
+```bash
+uv run geo-kin-provision register \
+  --product g1-inspire \
+  --wheel /path/to/geo_kin-0.1.0-cp310-abi3-manylinux_2_35_x86_64.whl \
+  --license /path/to/geo_kin_license.toml \
+  --name my-g1-license \
+  --activate
 uv run geo-kin-provision install
 ```
 
@@ -67,7 +79,7 @@ The live XR device still imports from a local SEW-Geometric-Teleop checkout
 everything else in this repo is self-contained.
 
 Runs out of the box with the public fallback solver; provision the licensed
-`geo_kin` build for the SEW geometric solver (see the sibling `geo_kin_core`
-checkout for wheel and license management).
+`geo_kin` build for the SEW geometric solver (see
+`external/geo_kin_core/README.md` for wheel and license management).
 
 MIT licensed. The SEW retargeting solver itself is patented & licensed separately.
