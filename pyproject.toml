@@ -11,6 +11,12 @@ license = { text = "MIT" }
 requires-python = ">=3.10"
 dependencies = ["numpy", "scipy", "mujoco", "geo-kin-core"]
 
+[tool.uv.sources]
+geo-kin-core = { path = "../geo_kin_core", editable = true }
+
+[tool.geo-kin]
+product = "g1-inspire"
+
 [project.optional-dependencies]
 hw = ["unitree_sdk2py", "pyyaml", "pymodbus"]
 devices = []  # xrt-device, mediapipe-device once split out

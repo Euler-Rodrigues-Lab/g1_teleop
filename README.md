@@ -8,6 +8,29 @@ Upper body + 3-DOF waist. Supported hands: **Inspire** and **Psyonic Ability
 Hand** — the hand is a config choice (`hand="inspire" | "psyonic"`), not a
 separate codebase. Legs are not retargeted yet (goals reserved in the API).
 
+## Install
+
+Keep one shared `geo_kin_core` checkout beside this repository:
+
+```bash
+cd /path/to/Euler-Rodrigues-Lab
+git clone https://github.com/Euler-Rodrigues-Lab/geo_kin_core.git
+git clone https://github.com/Euler-Rodrigues-Lab/g1_teleop.git
+cd g1_teleop
+uv sync
+```
+
+The public fallback is then available. For licensed G1/Inspire retargeting,
+register the supplied files once as described in the `geo_kin_core` README,
+then link that shared build into this environment:
+
+```bash
+uv run geo-kin-provision install
+```
+
+Use `--product g1-psyonic` when provisioning a separately registered Psyonic
+build. No private wheel or license belongs in this repository.
+
 ## Layout
 
 ```
@@ -43,8 +66,8 @@ The live XR device still imports from a local SEW-Geometric-Teleop checkout
 (`replay_offline --csv_file`), until the `xrt_device` repo is split out;
 everything else in this repo is self-contained.
 
-Runs out of the box with the public fallback solver; install the licensed
-`geo_kin` wheel for the SEW geometric solver (see Euler-Rodrigues-Lab/geo_kin_core
-for how solver resolution works).
+Runs out of the box with the public fallback solver; provision the licensed
+`geo_kin` build for the SEW geometric solver (see the sibling `geo_kin_core`
+checkout for wheel and license management).
 
 MIT licensed. The SEW retargeting solver itself is patented & licensed separately.
