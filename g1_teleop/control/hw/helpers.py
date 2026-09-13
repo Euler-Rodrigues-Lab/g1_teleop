@@ -1,9 +1,7 @@
 # Copyright (c) 2026 Chuizheng Kong. Licensed under the MIT License.
 """Low-level command/rotation helpers for the Unitree DDS interface.
 
-Ported from the monolith
-(SEW-Geometric-Teleop/projects/g1_upper_body_teleop/common/common/
-{command_helper.py, rotation_helper.py}). The command helpers operate on
+Standalone implementation extracted from the original controller. The command helpers operate on
 LowCmd message objects duck-typed (``cmd.motor_cmd[i].q/qd/kp/kd/tau``), so
 this module imports nothing from ``unitree_sdk2py`` — sim-only installs can
 import it freely.

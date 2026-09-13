@@ -1,7 +1,7 @@
 # g1_teleop
 
 Unitree G1 teleoperation: MuJoCo sim + real-robot (DDS) control, driven by any
-`geo_kin_core` device (XR full-body, MediaPipe, offline BVH/CSV) through the
+`geo_kin_core` device (XR full-body, MediaPipe, recorded CSV/NPZ) through the
 `RetargetingSolver` interface.
 
 Upper body + 3-DOF waist. Supported hands: **Inspire** and **Psyonic Ability
@@ -10,34 +10,36 @@ separate codebase. Legs are not retargeted yet (goals reserved in the API).
 
 ## Install
 
-Clone with the pinned public-core submodule and sync:
+Keep the developing `XRT_devices` checkout beside this repository. For the current
+local migration (device changes are not published yet), install explicitly:
 
 ```bash
-git clone --recurse-submodules https://github.com/Euler-Rodrigues-Lab/g1_teleop.git
 cd g1_teleop
-uv sync
+uv venv
+uv pip install -e 'external/geo_kin_core[fallback]' -e '../XRT_devices[xr,recording]' -e . pytest
+source .venv/bin/activate
 ```
 
-For an existing checkout:
+For an existing checkout, initialize its core submodule first:
 
 ```bash
-git pull
 git submodule update --init --recursive
-uv sync
 ```
 
+Use this direct install rather than `uv sync` while the optional Unitree SDK has
+no package-registry release. It does not install or contact robot hardware.
 This installs `external/geo_kin_core`, including the public fallback and the
 `geo-kin-provision` command. For licensed G1/Inspire retargeting, register the
 supplied files once per user and then link the central build into this venv:
 
 ```bash
-uv run geo-kin-provision register \
+geo-kin-provision register \
   --product g1-inspire \
   --wheel /path/to/geo_kin-0.1.0-cp310-abi3-manylinux_2_35_x86_64.whl \
   --license /path/to/geo_kin_license.toml \
   --name my-g1-license \
   --activate
-uv run geo-kin-provision install
+geo-kin-provision install
 ```
 
 Use `--product g1-psyonic` when provisioning a separately registered Psyonic
@@ -52,7 +54,7 @@ g1_teleop/
 │              # to the exact URDF/MJCF sources committed alongside),
 │              # sample_motion/*.npz (recorded human motion, see its README)
 ├── control/   # G1 MuJoCo controller + Unitree DDS hardware layer (hw/)
-├── input/     # device adapters (interim XR adapter -> RetargetFrame)
+├── input/     # thin re-exports of shared public device adapters
 ├── envs/      # MuJoCo sim environments
 ├── scripts/   # dev utilities (e.g. transcode a recording to a frame stream)
 └── demos/     # teleop_xr.py (live XR) and replay_offline.py (recorded motion)
@@ -73,10 +75,30 @@ controller as live teleoperation, with the shared `geo_kin_core.viz` overlays
 vendored sample frame stream, so it needs no capture device, no hardware, and
 no monolith checkout — see `g1_teleop/assets/sample_motion/README.md`.
 
-The live XR device still imports from a local SEW-Geometric-Teleop checkout
-(`--monolith_path` / `GEO_TELEOP_MONOLITH`), as does reading raw recorded CSVs
-(`replay_offline --csv_file`), until the `xrt_device` repo is split out;
-everything else in this repo is self-contained.
+## Test Quest or webcam in simulation
+
+```bash
+# Quest: enter this computer's IP and port 8080 in XRT-Client.
+python -m g1_teleop.demos.teleop_xr --device xrt --hand inspire --backend auto
+
+# Optional bone CSV recording:
+python -m g1_teleop.demos.teleop_xr --device xrt --record_data
+
+# Webcam: default models download once, then are reused from the user cache.
+uv pip install -e '../XRT_devices[mediapipe]'
+python -m g1_teleop.demos.teleop_xr --device mediapipe \
+  --camera_id 0 --camera_display --backend auto
+```
+
+Simulation is the default. `--backend auto` prints the selected solver; use
+`--backend licensed` to require Rust or `--backend mink` for the public fallback.
+MINK is a different algorithm and does not reproduce the analytic solver's finger
+retargeting or safety filter. MediaPipe currently supplies arms/hands, not full-body
+tracking; waist solving is disabled for camera input. Webcam and headset operation
+await user validation. Exit the MuJoCo viewer or press Ctrl-C to stop the device.
+
+Raw CSV replay and transcoding use `xrt_devices` directly; no checkout path or
+environment variable is needed. Recordings contain bone rows only in this release.
 
 Runs out of the box with the public fallback solver; provision the licensed
 `geo_kin` build for the SEW geometric solver (see

@@ -1,8 +1,7 @@
 # Copyright (c) 2026 Chuizheng Kong. Licensed under the MIT License.
 """MuJoCo controller for G1 full-body teleoperation.
 
-Ported from the monolith
-(SEW-Geometric-Teleop/projects/g1_full_body_kinematic/g1_full_body_mujoco_controller.py).
+Standalone implementation extracted from the original controller.
 Applies joint position goals to the simulation and manages the mocap body /
 follow camera. `set_joint_goals` is duck-typed: it accepts either the legacy
 goals dict (``{"q_goal_right": ..., ...}``) or any object exposing the same

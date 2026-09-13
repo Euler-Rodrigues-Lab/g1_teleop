@@ -1,48 +1,5 @@
 # Copyright (c) 2026 Chuizheng Kong. Licensed under the MIT License.
-"""G1 offline replay demo: recorded human CSV -> retargeting -> MuJoCo.
-
-Port of the monolith demo_g1_inspire_xr_robot_teleop_offline.py onto the
-geo_kin_core interface: solver = ``resolve_session(robot='g1', hand=...)``
-(licensed `geo_kin` wheel -> private geo_kin_ref -> public mink fallback),
-controller = :class:`g1_teleop.control.G1InspireHandMuJoCoController` (inspire)
-or :class:`g1_teleop.control.G1FullBodyMuJoCoController` (psyonic), overlays =
-:mod:`geo_kin_core.viz`.
-
-Two motion sources, same interface:
-
-* a **frame stream** (``--frames``, the default) — the vendored sample motion,
-  device-neutral numpy, needs nothing but this repo;
-* a **recorded CSV** (``--csv_file``) — needs a SEW-Geometric-Teleop checkout
-  for the device stack (``--monolith_path`` / ``GEO_TELEOP_MONOLITH``); use
-  ``g1_teleop.scripts.transcode_recording`` to turn one into a frame stream.
-
-No headset and no robot required — this is the loop to use for tuning the
-solver, eyeballing the self-collision filter, and measuring solve time.
-Playback is kinematic (``apply_control(kinematic_mode=True)`` + ``mj_forward``),
-so the robot follows goals exactly instead of fighting gravity, and the
-recording is sampled on a fixed 1/max_fr clock so a replay is reproducible
-regardless of solve speed (--wall_clock restores wall-clock sampling).
-
-Differences from the monolith original, both deliberate:
-  * the 3-DOF waist is actually solved from the recording's ``R_lower_upper``
-    (the old demo stubbed it to identity); pass --no-torso for the old behavior;
-  * the recording is sampled on a fixed clock (see below).
-
-Base alignment stays on the monolith's offline default, ``manual``: it is the
-mode that anchors the capture frame to the robot, so the human-capsule overlay
-is drawn on top of the robot rather than at the raw capture coordinates.
-
-Examples:
-    # Vendored sample motion, inspire hands, viewer + overlays (no setup)
-    python -m g1_teleop.demos.replay_offline
-
-    # A recorded CSV instead (needs the monolith checkout)
-    python -m g1_teleop.demos.replay_offline \
-        --csv_file $GEO_TELEOP_MONOLITH/References/recordings/ipman_roll.csv
-
-    # Headless timing/collision sweep over one pass, stats to npz
-    python -m g1_teleop.demos.replay_offline --headless --no-loop --log_stats stats.npz
-"""
+"""Replay bundled NPZ frames or public XRT CSV recordings in simulation."""
 
 import argparse
 import sys
@@ -52,7 +9,7 @@ import traceback
 import mujoco
 import numpy as np
 
-from geo_kin_core.session import resolve_session
+from g1_teleop.session import resolve_g1_session
 from geo_kin_core.viz import HumanCapsuleViz, capsules, draw_filtered_sew
 
 from g1_teleop import SAMPLE_MOTION, XML_INSPIRE_MOUNTED, XML_POSITION_CTRL_DANCE_W_HANDS
@@ -84,7 +41,7 @@ def parse_args():
                         help=f"geo_kin_core frame stream (.npz); default: the vendored "
                              f"sample motion ({SAMPLE_MOTION.name})")
     source.add_argument("--csv_file", default=None,
-                        help="Recorded OpenXR body-pose CSV (needs a monolith checkout)")
+                        help="Recorded OpenXR body-pose CSV (xrt-devices[recording])")
     parser.add_argument("--hand", choices=["inspire", "psyonic"], default="inspire",
                         help="Hand embodiment (selects sim model + controller)")
     parser.add_argument("--playback_speed", type=float, default=1.0,
@@ -110,8 +67,6 @@ def parse_args():
                         default=[0.85, 0.85, 0.65], metavar=("X", "Y", "Z"))
     parser.add_argument("--mocap_offset", type=float, nargs=3,
                         default=[0.0, 0.0, 0.4], metavar=("X", "Y", "Z"))
-    parser.add_argument("--monolith_path", default=None,
-                        help="SEW-Geometric-Teleop checkout (else GEO_TELEOP_MONOLITH)")
     parser.add_argument("--headless", action="store_true",
                         help="No viewer (timing/collision sweeps, CI)")
     parser.add_argument("--max_frames", type=int, default=None,
@@ -123,6 +78,7 @@ def parse_args():
     parser.add_argument("--wall_clock", action="store_true",
                         help="Sample the recording by wall-clock time instead of a "
                              "fixed 1/max_fr step (non-reproducible if solving lags)")
+    parser.add_argument("--backend", choices=["auto", "licensed", "reference", "mink"], default="auto")
     return parser.parse_args()
 
 
@@ -144,11 +100,10 @@ def build(args):
         csv_file=args.csv_file,
         playback_speed=args.playback_speed,
         loop=args.loop,
-        monolith_path=args.monolith_path,
     )
     print(f"Motion source: {source.describe()}")
-    session = resolve_session(
-        robot="g1",
+    session = resolve_g1_session(model,
+        backend=getattr(args, "backend", "auto"),
         hand=args.hand,
         control_rate_hz=float(args.max_fr),
         elbow_filter_cutoff_hz=args.elbow_filter_hz,

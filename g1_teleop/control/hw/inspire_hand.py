@@ -1,9 +1,7 @@
 # Copyright (c) 2026 Chuizheng Kong. Licensed under the MIT License.
 """Inspire RH56DFTP dexterous hand hardware interface (Modbus TCP).
 
-Ported from the monolith
-(SEW-Geometric-Teleop/projects/inspire_hand_teleop/inspire_hand_hw_controller.py,
-original author Roman Mineyev). Changes vs the monolith:
+Based on the Inspire hand interface by Roman Mineyev. Changes vs the monolith:
 
 * ``pymodbus`` is imported LAZILY (inside ``_import_modbus``): sim-only
   installs can import this module without the hardware SDK. Install it with

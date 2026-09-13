@@ -1,49 +1,22 @@
 # Copyright (c) 2026 Chuizheng Kong. Licensed under the MIT License.
-"""G1 XR teleoperation demo (sim + optional real-robot DDS control).
-
-Port of the monolith demo_g1_xr_robot_teleop_hw.py (arms/waist) and
-demo_g1_inspire_xr_robot_teleop_full_body[_hw].py (inspire hands) onto the
-geo_kin_core interface: solver = ``resolve_session(robot='g1', hand=...)``
-(licensed `geo_kin` wheel -> private geo_kin_ref -> public mink fallback),
-controller = :class:`g1_teleop.control.G1FullBodyMuJoCoController` (psyonic)
-or :class:`g1_teleop.control.G1InspireHandMuJoCoController` (inspire-mounted
-MJCF, hands actuated from q_goal_*_hand), device =
-:class:`g1_teleop.input.XRDeviceAdapter` (interim; needs a monolith checkout
-via --monolith_path or GEO_TELEOP_MONOLITH until the xrt_device repo exists).
-
-In --hw mode the arms + 3-DOF waist go over Unitree DDS
-(send_upper_body_targets) and, for --hand inspire, the finger goals go to the
-Inspire hands over direct Modbus TCP (control.hw.InspireHandController).
-
-Examples:
-    # Sim only (viewer), inspire-mounted model, fingers actuated in sim
-    python -m g1_teleop.demos.teleop_xr --hand inspire
-
-    # Real robot over DDS (arms + waist) + inspire hands over Modbus
-    python -m g1_teleop.demos.teleop_xr --hand inspire --hw --net eno1
-
-    # Real robot over DDS (arms + waist), psyonic hands in sim
-    python -m g1_teleop.demos.teleop_xr --hand psyonic --hw --net eno1
-
-    # Hardware code path without sending commands
-    python -m g1_teleop.demos.teleop_xr --hw --dry_run
-"""
+"""Live XRT or MediaPipe teleoperation in simulation, with explicit optional hardware."""
 
 import argparse
 import sys
 import time
 import traceback
+from contextlib import ExitStack
 
 import mujoco
 import mujoco.viewer
 import numpy as np
 
-from geo_kin_core.session import resolve_session
+from g1_teleop.session import resolve_g1_session
 from geo_kin_core.viz import HumanCapsuleViz, capsules, draw_filtered_sew
 
 from g1_teleop import XML_INSPIRE_MOUNTED, XML_POSITION_CTRL_DANCE_W_HANDS
 from g1_teleop.control import G1FullBodyMuJoCoController, G1InspireHandMuJoCoController
-from g1_teleop.input import XRDeviceAdapter
+from g1_teleop.input import XRDeviceAdapter, MediaPipeDeviceAdapter
 from g1_teleop.mjcf import load_mjcf
 
 
@@ -81,6 +54,8 @@ def parse_args():
                         help="Disable the 3-DOF waist solve (arms only)")
     parser.add_argument("--no_safety_filter", action="store_true",
                         help="Disable the XPBD self-collision SEW filter")
+    parser.add_argument("--dynamic", action="store_true",
+                        help="Enable dynamic simulation mode")
     # Rates
     parser.add_argument("--max_fr", default=1000, type=int,
                         help="Maximum frame rate (sim step rate)")
@@ -93,15 +68,18 @@ def parse_args():
                         help="Cartesian human->robot mocap scale")
     parser.add_argument("--mocap_offset", type=float, nargs=3, default=(0.0, 0.0, 0.4),
                         metavar=("OX", "OY", "OZ"), help="Mocap offset (m)")
-    # Device (interim monolith import)
-    parser.add_argument("--monolith_path", type=str, default=None,
-                        help="SEW-Geometric-Teleop checkout for the XR device "
-                             "(or set GEO_TELEOP_MONOLITH); temporary until "
-                             "the xrt_device repo exists")
+    parser.add_argument("--device", choices=["xrt", "mediapipe"], default="xrt")
+    parser.add_argument("--backend", choices=["auto", "licensed", "reference", "mink"], default="auto")
+    parser.add_argument("--host", default="0.0.0.0")
+    parser.add_argument("--port", type=int, default=8080)
+    parser.add_argument("--stale_after", type=float, default=0.5)
+    parser.add_argument("--camera_id", type=int, default=0)
+    parser.add_argument("--input_diagnostics", action="store_true", help="Print XRT receive age and consumer rate every 5 seconds")
+    parser.add_argument("--pose_model", help="MediaPipe Pose Landmarker .task file")
+    parser.add_argument("--hand_model", help="MediaPipe Hand Landmarker .task file")
     parser.add_argument("--record_data", action="store_true",
-                        help="Enable CSV recording of body pose and action data")
+                        help="Record XRT bone poses to CSV (no action or tag rows)")
     parser.add_argument("--output_dir", type=str, default="./recordings")
-    parser.add_argument("--ndigits", type=int, default=3)
     # Hardware
     parser.add_argument("--hw", action="store_true",
                         help="Send targets to the real G1 over Unitree DDS")
@@ -119,11 +97,31 @@ def parse_args():
                         help="Skip startup interpolation to deploy default pose")
     parser.add_argument("--no_exit_damping", action="store_true",
                         help="Skip sending damping command on exit")
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.device == "mediapipe":
+        if args.record_data:
+            parser.error("--record_data currently supports XRT only")
+    if args.ik_rate <= 0 or args.max_fr <= 0 or args.stale_after <= 0:
+        parser.error("rates and stale_after must be positive")
+    return args
 
 
 def main():
     args = parse_args()
+    if args.device == "xrt":
+        device = XRDeviceAdapter(host=args.host, port=args.port, stale_after=args.stale_after,
+                                 record_data=args.record_data, output_dir=args.output_dir,
+                                 diagnostics=args.input_diagnostics)
+    else:
+        device = MediaPipeDeviceAdapter(camera_id=args.camera_id, pose_model=args.pose_model,
+                                       hand_model=args.hand_model, display=True,
+                                       stale_after=args.stale_after)
+    with ExitStack() as resources:
+        resources.callback(device.cleanup)
+        run(args, device, resources)
+
+
+def run(args, device, resources):
     use_hw = args.hw and not args.dry_run
 
     # Sim model + controller per hand embodiment: psyonic hands are wired into
@@ -142,20 +140,12 @@ def main():
 
     print("Initializing teleoperation system...")
     try:
-        device = XRDeviceAdapter(
-            monolith_path=args.monolith_path,
-            record_data=args.record_data,
-            output_dir=args.output_dir,
-            ndigits=args.ndigits,
-        )
-
-        session = resolve_session(
-            robot="g1",
+        session = resolve_g1_session(model, backend=args.backend,
             hand=args.hand,
             control_rate_hz=float(args.ik_rate),
             elbow_filter_cutoff_hz=2.0,
             collision_avoidance=not args.no_safety_filter,
-            torso=not args.no_torso,
+            torso=not args.no_torso and args.device == "xrt",
             preprocess=dict(
                 shoulder_width_scale=args.shoulder_width_scale,
                 hip_width_scale=args.hip_width_scale,
@@ -164,6 +154,9 @@ def main():
             ),
         )
         print(f"Solver backend: {type(session).__module__}.{type(session).__name__}")
+        if type(session).__module__.startswith("geo_kin_core.fallback"):
+            print("MINK fallback does not solve finger joints; tracked hands will not move "
+                  "robot fingers. Use an available licensed/reference backend for hand IK.")
 
         controller = controller_cls(model, data, debug=False)
         print("Teleoperation system initialized successfully!")
@@ -181,12 +174,15 @@ def main():
             print("Initializing real G1 hardware interface...")
             init_channel_factory(0, args.net)
             hw_controller = Controller(Config())
+            if not args.no_exit_damping:
+                resources.callback(hw_controller.enter_damping, duration_s=0.3)
             print("Connected to real G1 low-level DDS.")
             if args.hand == "inspire":
                 from g1_teleop.control.hw import InspireHandController
 
                 print("Initializing Inspire hand hardware interface...")
                 hand_hw_controller = InspireHandController(hand_side="b")
+                resources.callback(hand_hw_controller.stop)
             # Sync simulation to current robot state immediately
             q_torso_hw, q_left_hw, q_right_hw = hw_controller.get_current_upper_body()
             update_sim_from_hardware(controller, data, q_right_hw, q_left_hw, q_torso_hw)
@@ -206,7 +202,7 @@ def main():
         viewer.cam.elevation = -10
         viewer.cam.lookat[:] = [0, 0, 0.8]
 
-        print("\nWaiting for a WebRTC client to connect...")
+        print(f"\nWaiting for {args.device} tracking...")
         while not device.is_connected and viewer.is_running():
             if hw_controller is not None and not args.no_hw_startup:
                 hw_controller.move_to_default_pos()
@@ -223,6 +219,8 @@ def main():
         print("Client connected! Starting control loop.")
         viewer.sync()
 
+        overlay = HumanCapsuleViz(viewer)
+        frame = None
         viz_interval = 1.0 / 30.0
         last_viz_time = 0.0
         ik_update_interval = 1.0 / args.ik_rate
@@ -255,7 +253,7 @@ def main():
                             hand_hw_controller.set_joint_goals(out)
                     last_ik_update_time = time.time()
 
-                controller.apply_control(engaged=True)
+                controller.apply_control(engaged=True, kinematic_mode=not args.dynamic)
                 if hand_hw_controller is not None:
                     hand_hw_controller.apply_control(engaged=True)
 
@@ -282,11 +280,22 @@ def main():
                 if time.time() - last_viz_time >= viz_interval:
                     viewer.user_scn.ngeom = 0
                     visualize_filtered_capsules(viewer, session, controller)
+                    if frame is not None:
+                        R_mocap = getattr(session, "R_mocap_world", None)
+                        p_mocap = getattr(session, "p_mocap_world", None)
+                        if R_mocap is not None and p_mocap is not None:
+                            overlay.set_base_offset(p_mocap, np.asarray(R_mocap).T)
+                        overlay.draw(frame)
                     last_viz_time = time.time()
 
-                mujoco.mj_step(model, data)
-                viewer.sync()
+                if args.dynamic:
+                    mujoco.mj_step(model, data)
+                else:
+                    data.qvel[:] = 0
+                    data.qacc_warmstart[:] = 0
+                    mujoco.mj_forward(model, data)
 
+                viewer.sync()
                 elapsed = time.time() - start_time
                 if elapsed < 1 / args.max_fr:
                     time.sleep(1 / args.max_fr - elapsed)
@@ -294,15 +303,6 @@ def main():
             pass
 
     print("Shutting down...")
-    if args.record_data:
-        device.cleanup()
-    if hand_hw_controller is not None:
-        try:
-            hand_hw_controller.stop()
-        except Exception as e:
-            print(f"Error stopping Inspire hand hardware: {e}")
-    if hw_controller is not None and not args.no_exit_damping:
-        hw_controller.enter_damping(duration_s=0.3)
     print("Demo completed.")
 
 

@@ -1,8 +1,7 @@
 # Copyright (c) 2026 Chuizheng Kong. Licensed under the MIT License.
 """Hardware configuration loader (g1.yaml).
 
-Ported from the monolith
-(SEW-Geometric-Teleop/projects/g1_upper_body_teleop/config.py).
+Standalone implementation extracted from the original controller.
 """
 
 from pathlib import Path

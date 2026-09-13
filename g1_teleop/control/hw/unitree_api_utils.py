@@ -1,8 +1,7 @@
 # Copyright (c) 2026 Chuizheng Kong. Licensed under the MIT License.
 """Unitree G1 low-level DDS hardware interface.
 
-Ported from the monolith
-(SEW-Geometric-Teleop/projects/g1_upper_body_teleop/unitree_api_utils.py).
+Standalone implementation extracted from the original controller.
 Changes vs the monolith:
 
 * ``unitree_sdk2py`` imports are LAZY (inside ``_import_sdk``): sim-only

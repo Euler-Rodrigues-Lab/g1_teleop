@@ -1,14 +1,7 @@
 # Copyright (c) 2026 Chuizheng Kong. Licensed under the MIT License.
-"""Offline replay: the vendored sample frame stream, the adapter conversion, and
-(when a monolith checkout with the device deps is available) the CSV path.
+"""Public sample replay and typed-frame conversion tests."""
 
-Only the CSV tests need the monolith. Everything else — including replaying the
-vendored sample motion through the demo — runs on a clean checkout.
-"""
-
-import importlib.util
 import os
-from pathlib import Path
 
 os.environ.setdefault("MUJOCO_GL", "egl")
 
@@ -17,31 +10,6 @@ import pytest
 
 from g1_teleop import SAMPLE_MOTION
 from g1_teleop.input import action_to_retarget_frame, open_motion_source
-
-MONOLITH = os.environ.get("GEO_TELEOP_MONOLITH")
-
-
-def _monolith_recording():
-    """A recording from the monolith checkout, if the device deps are present."""
-    if not MONOLITH:
-        return None
-    if importlib.util.find_spec("pandas") is None:
-        return None
-    if importlib.util.find_spec("xr_robot_teleop_server") is None:
-        return None
-    for name in ("picking_up_mustard.csv", "fridge_stationary.csv"):
-        csv = Path(MONOLITH) / "References" / "recordings" / name
-        if csv.exists():
-            return csv
-    return None
-
-
-RECORDING = _monolith_recording()
-needs_recording = pytest.mark.skipif(
-    RECORDING is None,
-    reason="needs GEO_TELEOP_MONOLITH + device deps (pandas, xr_robot_teleop_server)",
-)
-
 
 def test_leg_keypoint_dicts_pass_through():
     """Regression: the device sends per-leg DICTS, not arrays, for *_hka.
@@ -69,17 +37,6 @@ def test_empty_action_is_none():
     assert action_to_retarget_frame({}) is None
     assert action_to_retarget_frame(None) is None
 
-
-@needs_recording
-def test_offline_adapter_yields_frames():
-    from g1_teleop.input import OfflineCSVAdapter
-
-    src = OfflineCSVAdapter(RECORDING, loop=False)
-    assert src.duration > 0.0
-    frame, bones = src.get_frame_at_time(0.5)
-    assert frame is not None and bones is not None
-    assert frame.right_sew is not None and frame.left_sew is not None
-    assert frame.R_lower_upper is not None
 
 
 def _args(*argv):
@@ -127,18 +84,6 @@ def test_replay_demo_headless_from_sample(hand):
     assert controller.q_goal_torso is not None
 
 
-@needs_recording
-@pytest.mark.geo
-def test_replay_demo_headless_from_csv():
-    """The CSV path stays wired (needs the monolith device stack)."""
-    from g1_teleop.demos.replay_offline import build, step
-
-    args = _args("--csv_file", str(RECORDING), "--headless", "--no-loop")
-    model, data, controller, session, source = build(args)
-    frame, _ = step(model, data, controller, session, source, 0.5)
-    assert frame is not None
-    assert controller.q_goal_torso is not None
-
 
 def test_sample_motion_carries_the_capture_skeleton():
     """The overlay draws raw bones, so the vendored stream must ship them."""
@@ -152,44 +97,3 @@ def test_sample_motion_carries_the_capture_skeleton():
     assert any("Spine" in n for n in names)
     assert any("FootBall" in n for n in names)          # toes
     assert sum("Index" in n for n in names) >= 8        # per-hand finger bones
-
-
-@needs_recording
-def test_skeleton_matches_the_capture_side_visualizer():
-    """Our overlay must draw exactly the segments the monolith viewer draws."""
-    import sys
-
-    import geo_kin_core.viz.capsules as caps
-    from geo_kin_core.viz import HumanCapsuleViz
-    from g1_teleop.input import OfflineCSVAdapter
-
-    sys.path.insert(0, MONOLITH)
-    from projects.shared_scripts.mujoco_human_capsule import MujocoHumanCapsule
-
-    frame, bones = OfflineCSVAdapter(RECORDING, loop=False).get_frame_at_time(1.0)
-    p_off = np.array([0.3, -0.2, 0.1])
-    r_off = np.array([[0.0, -1.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]])
-
-    class FakeViewer:
-        user_scn = object()
-
-    reference = MujocoHumanCapsule(FakeViewer())
-    ref_caps = []
-    reference._add_capsule = lambda a, b, r: ref_caps.append(
-        (tuple(np.round(a, 9)), tuple(np.round(b, 9)), round(r, 9)))
-    reference.set_base_offset(p_off, r_off)
-    reference.update(bones)
-
-    ours = []
-    original = caps.add_capsule
-    caps.add_capsule = lambda v, a, b, r, rgba=None: (
-        ours.append((tuple(np.round(a, 9)), tuple(np.round(b, 9)), round(r, 9))), True)[1]
-    try:
-        viz = HumanCapsuleViz(FakeViewer())
-        viz.set_base_offset(p_off, r_off)
-        viz.draw(frame)
-    finally:
-        caps.add_capsule = original
-
-    assert len(ours) == len(ref_caps) > 60
-    assert sorted(ours) == sorted(ref_caps)

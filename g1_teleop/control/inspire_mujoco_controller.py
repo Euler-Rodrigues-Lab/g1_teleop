@@ -1,8 +1,7 @@
 # Copyright (c) 2026 Chuizheng Kong. Licensed under the MIT License.
 """MuJoCo controller for the G1 with Inspire hands mounted.
 
-Ported from the monolith
-(SEW-Geometric-Teleop/projects/inspire_hand_teleop/g1_with_inspire_hand_mujoco_controller.py).
+Standalone implementation extracted from the original controller.
 Subclasses :class:`G1FullBodyMuJoCoController`, swapping the psyonic finger
 joints for the 6 active Inspire finger joints per hand and enforcing the
 model's joint equalities (passive distal finger joints) when writing qpos

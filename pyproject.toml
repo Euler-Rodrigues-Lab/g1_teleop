@@ -9,17 +9,19 @@ description = "Unitree G1 teleoperation (sim + hardware) on the geo-kin-core int
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10"
-dependencies = ["numpy", "scipy", "mujoco", "geo-kin-core"]
+dependencies = ["numpy", "scipy", "mujoco", "geo-kin-core", "xrt-devices>=0.1.0"]
 
 [tool.uv.sources]
 geo-kin-core = { path = "external/geo_kin_core", editable = true }
+xrt-devices = { path = "../XRT_devices", editable = true }
 
 [tool.geo-kin]
 product = "g1-inspire"
 
 [project.optional-dependencies]
 hw = ["unitree_sdk2py", "pyyaml", "pymodbus"]
-devices = []  # xrt-device, mediapipe-device once split out
+devices = ["xrt-devices[xr,recording]>=0.1.0", "geo-kin-core[fallback]"]
+mediapipe = ["xrt-devices[mediapipe]>=0.1.0", "geo-kin-core[fallback]"]
 test = ["pytest"]
 
 [tool.setuptools.packages.find]
