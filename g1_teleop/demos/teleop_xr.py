@@ -68,7 +68,7 @@ def parse_args():
                         help="Cartesian human->robot mocap scale")
     parser.add_argument("--mocap_offset", type=float, nargs=3, default=(0.0, 0.0, 0.4),
                         metavar=("OX", "OY", "OZ"), help="Mocap offset (m)")
-    parser.add_argument("--device", choices=["xrt", "mediapipe"], default="xrt")
+    parser.add_argument("--device", choices=["xrt", "mediapipe"], default="mediapipe")
     parser.add_argument("--backend", choices=["auto", "licensed", "reference", "mink"], default="auto")
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--port", type=int, default=8080)

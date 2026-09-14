@@ -10,13 +10,12 @@ separate codebase. Legs are not retargeted yet (goals reserved in the API).
 
 ## Install
 
-Keep the developing `XRT_devices` checkout beside this repository. For the current
-local migration (device changes are not published yet), install explicitly:
+Initialize the bundled submodules, then sync the editable dependencies:
 
 ```bash
 cd g1_teleop
-uv venv
-uv pip install -e 'external/geo_kin_core[fallback]' -e '../XRT_devices[xr,recording]' -e . pytest
+git submodule update --init --recursive
+uv sync --extra devices --extra mediapipe --extra test
 source .venv/bin/activate
 ```
 
@@ -26,8 +25,8 @@ For an existing checkout, initialize its core submodule first:
 git submodule update --init --recursive
 ```
 
-Use this direct install rather than `uv sync` while the optional Unitree SDK has
-no package-registry release. It does not install or contact robot hardware.
+The optional Unitree SDK resolves from its public Git repository; add `--extra hw`
+only when needed. The command above does not install or contact robot hardware.
 This installs `external/geo_kin_core`, including the public fallback and the
 `geo-kin-provision` command. For licensed G1/Inspire retargeting, register the
 supplied files once per user and then link the central build into this venv:
@@ -85,7 +84,7 @@ python -m g1_teleop.demos.teleop_xr --device xrt --hand inspire --backend auto
 python -m g1_teleop.demos.teleop_xr --device xrt --record_data
 
 # Webcam: default models download once, then are reused from the user cache.
-uv pip install -e '../XRT_devices[mediapipe]'
+uv sync --extra devices --extra mediapipe
 python -m g1_teleop.demos.teleop_xr --device mediapipe \
   --camera_id 0 --camera_display --backend auto
 ```

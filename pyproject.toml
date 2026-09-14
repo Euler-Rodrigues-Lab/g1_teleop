@@ -13,7 +13,8 @@ dependencies = ["numpy", "scipy", "mujoco", "geo-kin-core", "xrt-devices>=0.1.0"
 
 [tool.uv.sources]
 geo-kin-core = { path = "external/geo_kin_core", editable = true }
-xrt-devices = { path = "../XRT_devices", editable = true }
+xrt-devices = { path = "external/XRT_devices", editable = true }
+unitree-sdk2py = { git = "https://github.com/unitreerobotics/unitree_sdk2_python.git" }
 
 [tool.geo-kin]
 product = "g1-inspire"
