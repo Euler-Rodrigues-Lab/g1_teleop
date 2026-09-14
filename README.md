@@ -15,18 +15,27 @@ Initialize the bundled submodules, then sync the editable dependencies:
 ```bash
 cd g1_teleop
 git submodule update --init --recursive
-uv sync --extra devices --extra mediapipe --extra test
+uv sync --locked --extra devices --extra mediapipe --extra test
 source .venv/bin/activate
 ```
 
-For an existing checkout, initialize its core submodule first:
+The command above installs Quest/WebRTC, webcam/MediaPipe and test dependencies
+for simulation. For a hardware-enabled environment, use:
 
 ```bash
-git submodule update --init --recursive
+uv sync --locked --extra devices --extra mediapipe --extra test --extra hw
 ```
 
-The optional Unitree SDK resolves from its public Git repository; add `--extra hw`
-only when needed. The command above does not install or contact robot hardware.
+The optional Unitree SDK resolves from its public Git repository. **Repeat
+`--extra hw` on subsequent syncs to retain hardware dependencies:** `uv sync`
+removes packages not required by the selected extras. `uv sync --inexact` can
+preserve additional installed packages, but explicitly selecting your extras is
+more reproducible. Installing hardware dependencies does not enable robot
+commands; hardware operation still requires the demo's `--hw` flag.
+
+After syncing, run `python -m pytest -m "not geo"` in the activated environment
+to test without changing its installed dependencies.
+
 This installs `external/geo_kin_core`, including the public fallback and the
 `geo-kin-provision` command. For licensed G1/Inspire retargeting, register the
 supplied files once per user and then link the central build into this venv:
@@ -84,9 +93,9 @@ python -m g1_teleop.demos.teleop_xr --device xrt --hand inspire --backend auto
 python -m g1_teleop.demos.teleop_xr --device xrt --record_data
 
 # Webcam: default models download once, then are reused from the user cache.
-uv sync --extra devices --extra mediapipe
+# MediaPipe dependencies are included in the Install commands above.
 python -m g1_teleop.demos.teleop_xr --device mediapipe \
-  --camera_id 0 --camera_display --backend auto
+  --camera_id 0 --backend auto
 ```
 
 Simulation is the default. `--backend auto` prints the selected solver; use
