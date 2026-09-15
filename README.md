@@ -4,9 +4,23 @@ Unitree G1 teleoperation: MuJoCo sim + real-robot (DDS) control, driven by any
 `geo_kin_core` device (XR full-body, MediaPipe, recorded CSV/NPZ) through the
 `RetargetingSolver` interface.
 
-Upper body + 3-DOF waist. Supported hands: **Inspire** and **Psyonic Ability
+Arms + legs + 3-DOF waist in the geometric backend. Supported hands: **Inspire** and **Psyonic Ability
 Hand** — the hand is a config choice (`hand="inspire" | "psyonic"`), not a
-separate codebase. Legs are not retargeted yet (goals reserved in the API).
+separate codebase.
+
+### Leg retargeting
+
+With a `geo_kin` build containing G1 session leg support (or the updated private
+reference backend), XR and recorded full-body frames drive both legs in MuJoCo.
+The session consumes `left_hka` / `right_hka` dictionaries with `H`, `K`, `A`
+and optional `ankle_rot`, all in the lower-body frame. It returns six angles per
+leg in hip pitch/roll/yaw, knee, ankle pitch/roll order. Missing or invalid leg
+tracking keeps the previous goal for that leg. `--hip_width_scale` adjusts the
+hip target before solving.
+
+The existing replay and live simulation commands use this automatically. Older
+wheels and the public MINK backend leave leg goals empty; update the geometric
+wheel to enable legs. The Unitree hardware command path remains upper-body-only.
 
 ## Install
 
