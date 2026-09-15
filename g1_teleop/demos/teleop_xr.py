@@ -115,7 +115,8 @@ def main():
     else:
         device = MediaPipeDeviceAdapter(camera_id=args.camera_id, pose_model=args.pose_model,
                                        hand_model=args.hand_model, display=True,
-                                       stale_after=args.stale_after)
+                                       stale_after=args.stale_after,
+                                       legs=not (args.hw and not args.dry_run))
     with ExitStack() as resources:
         resources.callback(device.cleanup)
         run(args, device, resources)

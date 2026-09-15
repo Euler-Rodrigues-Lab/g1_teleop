@@ -116,7 +116,12 @@ Simulation is the default. `--backend auto` prints the selected solver; use
 `--backend licensed` to require Rust or `--backend mink` for the public fallback.
 MINK is a different algorithm and does not reproduce the analytic solver's finger
 retargeting or safety filter. MediaPipe currently supplies arms/hands, not full-body
-tracking; waist solving is disabled for camera input. Webcam and headset operation
+tracking; waist solving is disabled for camera input. In simulation, MediaPipe
+also supplies measured hip/knee/ankle and heel/toe-based foot targets to the G1
+leg solver. Keep shoulders, hips and the tracked leg including its foot visible;
+missing or low-confidence landmarks hold that leg's last goal. This is kinematic
+pose imitation, not walking or balance control. Camera leg targets are disabled
+when actual hardware operation is enabled. Webcam and headset operation
 await user validation. Exit the MuJoCo viewer or press Ctrl-C to stop the device.
 
 Raw CSV replay and transcoding use `xrt_devices` directly; no checkout path or
