@@ -275,7 +275,7 @@ class InspireHandController:
     def _read_input_registers(self, client, address: int, count: int) -> list[int] | None:
         """Read input registers and return None on Modbus exception responses."""
         with self._get_io_lock(client):
-            response = client.read_holding_registers(address, count, slave=self.device_id)
+            response = client.read_holding_registers(address, count=count, device_id=self.device_id)
         if response.isError():
             print(f"Modbus read error at address={address}, count={count}: {response}")
             return None
@@ -479,16 +479,16 @@ class InspireHandController:
             with self._get_io_lock(client):
                 if mode & self.ActStates.ANGLE:
                     client.write_registers(self.RegAddr.ANGLE_SET,
-                                           kwargs.get('angle_set', [0] * 6), self.device_id)
+                                           kwargs.get('angle_set', [0] * 6), device_id=self.device_id)
                 if mode & self.ActStates.POSITION:
                     client.write_registers(self.RegAddr.POS_SET,
-                                           kwargs.get('pos_set', [0] * 6), self.device_id)
+                                           kwargs.get('pos_set', [0] * 6), device_id=self.device_id)
                 if mode & self.ActStates.FORCE:
                     client.write_registers(self.RegAddr.FORCE_SET,
-                                           kwargs.get('force_set', [0] * 6), self.device_id)
+                                           kwargs.get('force_set', [0] * 6), device_id=self.device_id)
                 if mode & self.ActStates.VELOCITY:
                     client.write_registers(self.RegAddr.SPEED_SET,
-                                           kwargs.get('speed_set', [0] * 6), self.device_id)
+                                           kwargs.get('speed_set', [0] * 6), device_id=self.device_id)
             return True
         except Exception as e:
             print(f"Modbus write exception: {e}")

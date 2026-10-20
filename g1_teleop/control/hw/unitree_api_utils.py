@@ -21,6 +21,7 @@ import time
 import numpy as np
 
 from .config import Config
+from .crc import lowcmd_crc
 from .helpers import MotorMode, create_damping_cmd, init_cmd_go, init_cmd_hg
 
 
@@ -44,7 +45,6 @@ def _import_sdk():
         from unitree_sdk2py.idl.unitree_go.msg.dds_ import WirelessController_
         from unitree_sdk2py.idl.unitree_hg.msg.dds_ import LowCmd_ as LowCmdHG
         from unitree_sdk2py.idl.unitree_hg.msg.dds_ import LowState_ as LowStateHG
-        from unitree_sdk2py.utils.crc import CRC
     except ImportError as e:  # pragma: no cover - exercised only without SDK
         raise ImportError(
             "unitree_sdk2py is required for real-robot control. "
@@ -59,7 +59,6 @@ def _import_sdk():
         "LowStateHG": LowStateHG,
         "LowStateGo": LowStateGo,
         "WirelessController_": WirelessController_,
-        "CRC": CRC,
         "new_lowcmd_hg": unitree_hg_msg_dds__LowCmd_,
         "new_lowstate_hg": unitree_hg_msg_dds__LowState_,
         "new_lowcmd_go": unitree_go_msg_dds__LowCmd_,
@@ -83,7 +82,6 @@ class Controller:
     def __init__(self, config: Config) -> None:
         self.config = config
         sdk = self._sdk = _import_sdk()
-        self._crc = sdk["CRC"]()
 
         # Initializing process variables
         self.qj = np.zeros(config.num_actions, dtype=np.float32)
@@ -179,7 +177,7 @@ class Controller:
         self.low_state = msg
 
     def send_cmd(self, cmd):
-        cmd.crc = self._crc.Crc(cmd)
+        cmd.crc = lowcmd_crc(cmd)
         self.lowcmd_publisher_.Write(cmd)
 
     def wait_for_low_state(self):
