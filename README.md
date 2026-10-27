@@ -9,6 +9,9 @@ submodules. The tested versions for this checkout are:
 python -m pip install "eurola-geo-kin-core==0.1.2" "eurola-xrt-devices==0.1.2"
 ```
 
+For an existing editable installation, run `python -m pip uninstall geo-kin-core xrt-devices`
+before installing the renamed packages, or use `uv sync` to reconcile the lockfile.
+
 Normal project installation (`uv sync` or `pip install` with the project and its
 local robot/simulator dependencies) selects these versions automatically. Imports
 and the `geo-kin-provision` command are unchanged. Other robot, simulator, and
