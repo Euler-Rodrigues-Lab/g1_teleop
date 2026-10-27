@@ -478,11 +478,59 @@ epath = [
 ]
 
 [[package]]
+name = "eurola-geo-kin-core"
+version = "0.1.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+    { name = "tomli", marker = "python_full_version < '3.11'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/7e/b8/6fadbd06ab78ed4db7fffee6e2cd7f446a61df1350c80fa9c5e24ebec671/eurola_geo_kin_core-0.1.2.tar.gz", hash = "sha256:12c8f38c169960e676019ec378542df4e70ce4ebf372ccd617af95d9022b52b4", size = 51043 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d6/4f/c0b5f5df9eac1b12be44ce914c4e94d69b4f98c5c5b78d809a5be364a7b5/eurola_geo_kin_core-0.1.2-py3-none-any.whl", hash = "sha256:07799c25c52340ab43e43cf3f3744416624366d6fe189841791753a61be63781", size = 48523 },
+]
+
+[package.optional-dependencies]
+fallback = [
+    { name = "mink" },
+    { name = "quadprog" },
+    { name = "scipy" },
+]
+
+[[package]]
+name = "eurola-xrt-devices"
+version = "0.1.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+    { name = "scipy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/41/a6/6e71c5e5dbf9efbab82463056077d1a75f4af2d319e1b1aa42b424eba9f1/eurola_xrt_devices-0.1.2.tar.gz", hash = "sha256:95564eed8da6321371caa7aed014a351380b28c0185bcbeb48a5378138d64d71", size = 124324 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/da/9f/7c4dd93236b006cf1e8f0e2470db332b80d03f9d60cd22bf92f7f6b5fcb6/eurola_xrt_devices-0.1.2-py3-none-any.whl", hash = "sha256:051fc75557cdd67a1bc1d96acd6b83ba5d3b66cf250b70018f5d3ecd2e5d446f", size = 92850 },
+]
+
+[package.optional-dependencies]
+mediapipe = [
+    { name = "mediapipe" },
+    { name = "opencv-contrib-python" },
+]
+recording = [
+    { name = "pandas" },
+]
+xr = [
+    { name = "aiortc" },
+    { name = "fastapi" },
+    { name = "loguru" },
+    { name = "uvicorn" },
+]
+
+[[package]]
 name = "exceptiongroup"
 version = "1.3.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions", marker = "python_full_version < '3.13'" },
+    { name = "typing-extensions", marker = "python_full_version < '3.11'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/50/79/66800aadf48771f6b62f7eb014e352e5d06856655206165d775e675a02c9/exceptiongroup-1.3.1.tar.gz", hash = "sha256:8b412432c6055b0b7d14c310000ae93352ed6754f70fa8f7c34141f91c4e3219", size = 30371 }
 wheels = [
@@ -600,17 +648,17 @@ name = "g1-teleop"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "geo-kin-core" },
+    { name = "eurola-geo-kin-core" },
+    { name = "eurola-xrt-devices" },
     { name = "mujoco" },
     { name = "numpy" },
     { name = "scipy" },
-    { name = "xrt-devices" },
 ]
 
 [package.optional-dependencies]
 devices = [
-    { name = "geo-kin-core", extra = ["fallback"] },
-    { name = "xrt-devices", extra = ["recording", "xr"] },
+    { name = "eurola-geo-kin-core", extra = ["fallback"] },
+    { name = "eurola-xrt-devices", extra = ["recording", "xr"] },
 ]
 hw = [
     { name = "pymodbus" },
@@ -618,56 +666,30 @@ hw = [
     { name = "unitree-sdk2py" },
 ]
 mediapipe = [
-    { name = "geo-kin-core", extra = ["fallback"] },
-    { name = "xrt-devices", extra = ["mediapipe"] },
+    { name = "eurola-geo-kin-core", extra = ["fallback"] },
+    { name = "eurola-xrt-devices", extra = ["mediapipe"] },
 ]
 test = [
     { name = "pytest" },
+    { name = "pyyaml" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "geo-kin-core", editable = "external/geo_kin_core" },
-    { name = "geo-kin-core", extras = ["fallback"], marker = "extra == 'devices'", editable = "external/geo_kin_core" },
-    { name = "geo-kin-core", extras = ["fallback"], marker = "extra == 'mediapipe'", editable = "external/geo_kin_core" },
+    { name = "eurola-geo-kin-core", specifier = "==0.1.2" },
+    { name = "eurola-geo-kin-core", extras = ["fallback"], marker = "extra == 'devices'", specifier = "==0.1.2" },
+    { name = "eurola-geo-kin-core", extras = ["fallback"], marker = "extra == 'mediapipe'", specifier = "==0.1.2" },
+    { name = "eurola-xrt-devices", specifier = "==0.1.2" },
+    { name = "eurola-xrt-devices", extras = ["mediapipe"], marker = "extra == 'mediapipe'", specifier = "==0.1.2" },
+    { name = "eurola-xrt-devices", extras = ["xr", "recording"], marker = "extra == 'devices'", specifier = "==0.1.2" },
     { name = "mujoco" },
     { name = "numpy" },
     { name = "pymodbus", marker = "extra == 'hw'" },
     { name = "pytest", marker = "extra == 'test'" },
     { name = "pyyaml", marker = "extra == 'hw'" },
+    { name = "pyyaml", marker = "extra == 'test'" },
     { name = "scipy" },
     { name = "unitree-sdk2py", marker = "extra == 'hw'", git = "https://github.com/unitreerobotics/unitree_sdk2_python.git" },
-    { name = "xrt-devices", editable = "external/XRT_devices" },
-    { name = "xrt-devices", extras = ["mediapipe"], marker = "extra == 'mediapipe'", editable = "external/XRT_devices" },
-    { name = "xrt-devices", extras = ["xr", "recording"], marker = "extra == 'devices'", editable = "external/XRT_devices" },
-]
-
-[[package]]
-name = "geo-kin-core"
-version = "0.1.0"
-source = { editable = "external/geo_kin_core" }
-dependencies = [
-    { name = "numpy" },
-    { name = "tomli", marker = "python_full_version < '3.11'" },
-]
-
-[package.optional-dependencies]
-fallback = [
-    { name = "mink" },
-    { name = "quadprog" },
-    { name = "scipy" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "mink", marker = "extra == 'fallback'" },
-    { name = "mujoco", marker = "extra == 'viz'" },
-    { name = "numpy" },
-    { name = "pin", marker = "extra == 'spec-tools'", specifier = ">=4.0.0" },
-    { name = "quadprog", marker = "extra == 'fallback'" },
-    { name = "scipy", marker = "extra == 'fallback'" },
-    { name = "scipy", marker = "extra == 'spec-tools'" },
-    { name = "tomli", marker = "python_full_version < '3.11'", specifier = ">=2" },
 ]
 
 [[package]]
@@ -2030,46 +2052,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/b3/8f/705086c9d734d3b663af0e9bb3d4de6578d08f46b1b101c2442fd9aecaa2/win32_setctime-1.2.0.tar.gz", hash = "sha256:ae1fdf948f5640aae05c511ade119313fb6a30d7eabe25fef9764dca5873c4c0", size = 4867 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e1/07/c6fe3ad3e685340704d314d765b7912993bcb8dc198f0e7a89382d37974b/win32_setctime-1.2.0-py3-none-any.whl", hash = "sha256:95d644c4e708aba81dc3704a116d8cbc974d70b3bdb8be1d150e36be6e9d1390", size = 4083 },
-]
-
-[[package]]
-name = "xrt-devices"
-version = "0.1.0"
-source = { editable = "external/XRT_devices" }
-dependencies = [
-    { name = "numpy" },
-    { name = "scipy" },
-]
-
-[package.optional-dependencies]
-mediapipe = [
-    { name = "mediapipe" },
-    { name = "opencv-contrib-python" },
-]
-recording = [
-    { name = "pandas" },
-]
-xr = [
-    { name = "aiortc" },
-    { name = "fastapi" },
-    { name = "loguru" },
-    { name = "uvicorn" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "aiortc", marker = "extra == 'xr'", specifier = ">=1.9,<2" },
-    { name = "build", marker = "extra == 'test'" },
-    { name = "fastapi", marker = "extra == 'xr'", specifier = ">=0.110,<1" },
-    { name = "httpx", marker = "extra == 'test'", specifier = ">=0.27" },
-    { name = "loguru", marker = "extra == 'xr'", specifier = ">=0.7,<1" },
-    { name = "mediapipe", marker = "extra == 'mediapipe'", specifier = ">=0.10.20,<0.11" },
-    { name = "numpy", specifier = ">=1.24" },
-    { name = "opencv-contrib-python", marker = "extra == 'mediapipe'", specifier = ">=4.8,<5" },
-    { name = "pandas", marker = "extra == 'recording'", specifier = ">=2,<3" },
-    { name = "pytest", marker = "extra == 'test'", specifier = ">=8" },
-    { name = "scipy", specifier = ">=1.10" },
-    { name = "uvicorn", marker = "extra == 'xr'", specifier = ">=0.29,<1" },
 ]
 
 [[package]]

@@ -12,17 +12,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-      - uses: actions/checkout@v4
-        with:
-          repository: Euler-Rodrigues-Lab/XRT_devices
-          # Set XRT_DEVICES_REF to a released commit before a reproducible release.
-          ref: ${{ vars.XRT_DEVICES_REF || 'main' }}
-          path: .ci/XRT_devices
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: '${{ matrix.python }}'
       - run: uv venv
       - name: Install pinned core, public devices and robot
-        run: uv pip install -e 'external/geo_kin_core[fallback]' -e '.ci/XRT_devices[xr,recording]' -e . pytest
+        run: uv pip install "eurola-geo-kin-core[fallback]==0.1.2" "eurola-xrt-devices[xr,recording]==0.1.2" -e '.[test]'
       - name: Public tests including solver fallback
         run: .venv/bin/python -m pytest -q -m 'not geo'

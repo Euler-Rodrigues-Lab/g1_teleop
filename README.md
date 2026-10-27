@@ -1,5 +1,25 @@
 # g1_teleop
 
+## Shared Python dependencies
+
+`geo_kin_core` and `xrt_devices` now come from versioned PyPI wheels, not Git
+submodules. The tested versions for this checkout are:
+
+```bash
+python -m pip install "eurola-geo-kin-core==0.1.2" "eurola-xrt-devices==0.1.2"
+```
+
+Normal project installation (`uv sync` or `pip install` with the project and its
+local robot/simulator dependencies) selects these versions automatically. Imports
+and the `geo-kin-provision` command are unchanged. Other robot, simulator, and
+hardware submodules remain where needed; `--recurse-submodules` below is for those.
+The private `geo_kin` solver and its license are still supplied separately.
+
+For shared-library development, explicitly install matching source checkouts with
+`python -m pip install -e /path/to/geo_kin_core -e /path/to/XRT_devices` and run the
+venv's Python directly. A subsequent `uv sync` restores the released packages.
+
+
 Unitree G1 teleoperation: MuJoCo sim + real-robot (DDS) control, driven by any
 `geo_kin_core` device (XR full-body, MediaPipe, recorded CSV/NPZ) through the
 `RetargetingSolver` interface.
@@ -24,11 +44,10 @@ wheel to enable legs. The Unitree hardware command path remains upper-body-only.
 
 ## Install
 
-Initialize the bundled submodules, then sync the editable dependencies:
+Install the project with its released Python dependencies:
 
 ```bash
 cd g1_teleop
-git submodule update --init --recursive
 uv sync --locked --extra devices --extra mediapipe --extra test
 source .venv/bin/activate
 ```
@@ -50,7 +69,7 @@ commands; hardware operation still requires the demo's `--hw` flag.
 After syncing, run `python -m pytest -m "not geo"` in the activated environment
 to test without changing its installed dependencies.
 
-This installs `external/geo_kin_core`, including the public fallback and the
+This installs `eurola-geo-kin-core` from PyPI, including the public fallback and the
 `geo-kin-provision` command. For licensed G1/Inspire retargeting, register the
 supplied files once per user and then link the central build into this venv:
 
@@ -129,6 +148,6 @@ environment variable is needed. Recordings contain bone rows only in this releas
 
 Runs out of the box with the public fallback solver; provision the licensed
 `geo_kin` build for the SEW geometric solver (see
-`external/geo_kin_core/README.md` for wheel and license management).
+the [core package documentation](https://pypi.org/project/eurola-geo-kin-core/) for wheel and license management).
 
 MIT licensed. The SEW retargeting solver itself is patented & licensed separately.
