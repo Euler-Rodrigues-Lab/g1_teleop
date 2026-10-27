@@ -15,7 +15,7 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: '${{ matrix.python }}'
-      - run: uv venv
+      - run: uv venv --clear
       - name: Install pinned core, public devices and robot
         run: uv pip install "eurola-geo-kin-core[fallback]==0.1.2" "eurola-xrt-devices[xr,recording]==0.1.2" -e '.[test]'
       - name: Public tests including solver fallback
